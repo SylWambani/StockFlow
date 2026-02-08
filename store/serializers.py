@@ -29,6 +29,7 @@ class ProductSerializer(serializers.ModelSerializer):
         
 class ProductValueSerializer(serializers.ModelSerializer):
     product_value = serializers.SerializerMethodField()
+    category = serializers.StringRelatedField()
 
     class Meta:
         model = Product

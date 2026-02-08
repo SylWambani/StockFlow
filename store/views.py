@@ -19,6 +19,7 @@ class CategoryViewSet(ModelViewSet):
             return Response({'error': 'Category cannot be deleted because it includes one or more products.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
         category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+        
 
 class UnitMeasurementViewSet(ModelViewSet):
     queryset = UnitsMeasurement.objects.all()
@@ -42,6 +43,18 @@ class ProductValueViewSet(ReadOnlyModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
 
+        category_values = (
+            queryset
+            .values(category_name=F('category__name'))
+            .annotate(
+                total_value=Sum(
+                    F('current_quantity') * F('buying_price'),
+                    output_field=DecimalField()
+                )
+            )
+            .order_by('category_name')
+        )
+
         total_value = queryset.aggregate(
             total=Sum(
                 F('current_quantity') * F('buying_price'),
@@ -51,8 +64,11 @@ class ProductValueViewSet(ReadOnlyModelViewSet):
 
         return Response({
             "total_inventory_value": total_value,
+            "categories": category_values,
             "products": serializer.data
         })
+    
+    
 
 class SupplierViewSet(ModelViewSet):
     queryset = Supplier.objects.all()
