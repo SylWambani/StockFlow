@@ -3,6 +3,7 @@ from . import views
 
 router = routers.DefaultRouter()
 router.register('products', views.ProductViewSet, basename='products')
+router.register('product-value', views.ProductValueViewSet, basename='product-value')
 router.register('categories', views.CategoryViewSet)
 router.register('unit-measurements', views.UnitMeasurementViewSet)
 router.register('suppliers', views.SupplierViewSet)

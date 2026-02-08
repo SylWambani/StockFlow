@@ -1,10 +1,12 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelViewSet
 from rest_framework import status
+from rest_framework.decorators import action
+from django.db.models import Sum, F, DecimalField
 from django.db.models.aggregates import Count
 from .models import Category, Customer, Payments, Product, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
-from .serializers import CategorySerializer, CustomerSerializer, PaymentsSerializer, ProductSerializer, PurchaseOrderSerializer, SalesOrderSerializer, SupplierSerializer, UnitMeasurementSerializer
+from .serializers import CategorySerializer, CustomerSerializer, PaymentsSerializer, ProductSerializer, ProductValueSerializer, PurchaseOrderSerializer, SalesOrderSerializer, SupplierSerializer, UnitMeasurementSerializer
 
 class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.annotate(
@@ -28,6 +30,29 @@ class ProductViewSet(ModelViewSet):
 
     def get_serializer_context(self):
         return {'request': self.request}
+    
+class ProductValueViewSet(ReadOnlyModelViewSet):
+    serializer_class = ProductValueSerializer
+
+    def get_queryset(self):
+        return Product.objects.select_related('category').all()
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        serializer = self.get_serializer(queryset, many=True)
+
+        total_value = queryset.aggregate(
+            total=Sum(
+                F('current_quantity') * F('buying_price'),
+                output_field=DecimalField()
+            )
+        )['total'] or 0
+
+        return Response({
+            "total_inventory_value": total_value,
+            "products": serializer.data
+        })
 
 class SupplierViewSet(ModelViewSet):
     queryset = Supplier.objects.all()

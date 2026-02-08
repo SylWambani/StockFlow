@@ -10,7 +10,6 @@ class CategorySerializer(serializers.ModelSerializer):
 
     products_count = serializers.IntegerField(read_only=True)
     total_category_inventory = serializers.SerializerMethodField()
-    inventory_value = serializers.SerializerMethodField()
 
     def get_total_category_inventory(self, obj):
         return obj.product_set.aggregate(total=Sum('current_quantity'))['total'] or 0  
@@ -28,6 +27,15 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'name','sku', 'category', 'current_quantity', 'reorder_level', 'buying_price', 'selling_price', 'unit_of_measure', 'is_active']
         
+class ProductValueSerializer(serializers.ModelSerializer):
+    product_value = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields=['id', 'name', 'category', 'current_quantity', 'buying_price', 'product_value']
+
+    def get_product_value(self, product:Product):
+        return product.current_quantity * product.buying_price
 
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
