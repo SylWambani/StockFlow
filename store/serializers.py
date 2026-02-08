@@ -1,23 +1,33 @@
 from rest_framework import serializers
 from decimal import Decimal
+from django.db.models.aggregates import Count, Sum
 from .models import Category, Customer, Payments, Product, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'products_count']
+        fields = ['id', 'name', 'description', 'products_count', 'total_category_inventory']
 
     products_count = serializers.IntegerField(read_only=True)
+    total_category_inventory = serializers.SerializerMethodField()
+    inventory_value = serializers.SerializerMethodField()
 
+    def get_total_category_inventory(self, obj):
+        return obj.product_set.aggregate(total=Sum('current_quantity'))['total'] or 0  
+    
 class UnitMeasurementSerializer(serializers.ModelSerializer):
     class Meta:
         model = UnitsMeasurement
         fields = ['id', 'name']
 
 class ProductSerializer(serializers.ModelSerializer):
+    sku = serializers.ReadOnlyField()
+    category = serializers.StringRelatedField()
+    unit_of_measure = serializers.StringRelatedField()
     class Meta:
         model = Product
-        fields = ['id', 'name', 'sku', 'category', 'current_quantity', 'reorder_level', 'buying_price', 'selling_price', 'unit_of_measure', 'is_active']
+        fields = ['id', 'name','sku', 'category', 'current_quantity', 'reorder_level', 'buying_price', 'selling_price', 'unit_of_measure', 'is_active']
+        
 
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:

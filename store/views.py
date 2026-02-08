@@ -1,4 +1,7 @@
+from django.shortcuts import get_object_or_404
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework import status
 from django.db.models.aggregates import Count
 from .models import Category, Customer, Payments, Product, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
 from .serializers import CategorySerializer, CustomerSerializer, PaymentsSerializer, ProductSerializer, PurchaseOrderSerializer, SalesOrderSerializer, SupplierSerializer, UnitMeasurementSerializer
@@ -8,6 +11,13 @@ class CategoryViewSet(ModelViewSet):
         products_count=Count('product')).all()
     serializer_class = CategorySerializer
 
+    def delete(self, request, pk):
+        category = get_object_or_404(Category, pk=pk)
+        if category.products.count() > 0:
+            return Response({'error': 'Category cannot be deleted because it includes one or more products.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class UnitMeasurementViewSet(ModelViewSet):
     queryset = UnitsMeasurement.objects.all()
     serializer_class = UnitMeasurementSerializer
@@ -15,6 +25,9 @@ class UnitMeasurementViewSet(ModelViewSet):
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def get_serializer_context(self):
+        return {'request': self.request}
 
 class SupplierViewSet(ModelViewSet):
     queryset = Supplier.objects.all()

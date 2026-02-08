@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from .utils import create_unique_code
 
 class Category(models.Model):
     name = models.CharField(max_length=255, blank=False)
@@ -14,11 +15,17 @@ class Category(models.Model):
 class UnitsMeasurement(models.Model):
     name = models.CharField(max_length=100, blank=False)
 
+    def __str__(self) -> str:
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
 
 class Product(models.Model):
     name = models.CharField(max_length=255, blank=False)
     slug = models.SlugField()
-    sku = models.CharField(max_length=255, unique=True, blank=False)
+    sku = models.CharField(max_length=255, unique=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT)
     current_quantity = models.PositiveIntegerField( validators=[MinValueValidator(0)])
     reorder_level = models.IntegerField(default=0)
@@ -26,9 +33,23 @@ class Product(models.Model):
     selling_price = models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
     unit_of_measure = models.ForeignKey(UnitsMeasurement, on_delete=models.PROTECT)
     is_active = models.BooleanField(default=True)
+    short_code = models.CharField(max_length=6, unique=True, blank=True, null=True)
 
     def __str__(self) -> str:
         return self.name
+    
+    def save(self, *args, **kwargs):
+        if not self.short_code:
+            self.short_code = create_unique_code()
+
+        if not self.sku:
+            cat = self.category.name[:3].upper()
+            name = self.name[:3].upper()
+
+            base_sku = f"{cat}-{name}-{self.short_code}"
+
+            self.sku=base_sku
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['name']
