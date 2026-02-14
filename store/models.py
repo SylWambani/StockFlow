@@ -1,6 +1,8 @@
+import uuid
 from django.db import models
 from django.core.validators import MinValueValidator
-from .utils import create_unique_code
+from django.core.exceptions import ValidationError
+#from .utils import create_unique_code
 
 class Category(models.Model):
     name = models.CharField(max_length=255, blank=False)
@@ -25,34 +27,81 @@ class UnitsMeasurement(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=255, blank=False)
     slug = models.SlugField()
-    sku = models.CharField(max_length=255, unique=True, blank=True)
+    #sku = models.CharField(max_length=255, unique=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT)
-    current_quantity = models.PositiveIntegerField( validators=[MinValueValidator(0)])
-    reorder_level = models.IntegerField(default=0)
-    buying_price = models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
-    selling_price = models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
+    #current_quantity = models.PositiveIntegerField( validators=[MinValueValidator(0)])
+    #reorder_level = models.IntegerField(default=0)
     unit_of_measure = models.ForeignKey(UnitsMeasurement, on_delete=models.PROTECT)
     is_active = models.BooleanField(default=True)
-    short_code = models.CharField(max_length=6, unique=True, blank=True, null=True)
 
     def __str__(self) -> str:
         return self.name
     
-    def save(self, *args, **kwargs):
-        if not self.short_code:
-            self.short_code = create_unique_code()
+    # def save(self, *args, **kwargs):
+    #     if not self.short_code:
+    #         self.short_code = create_unique_code()
 
-        if not self.sku:
-            cat = self.category.name[:3].upper()
-            name = self.name[:3].upper()
+    #     if not self.sku:
+    #         cat = self.category.name[:3].upper()
+    #         name = self.name[:3].upper()
 
-            base_sku = f"{cat}-{name}-{self.short_code}"
+    #         base_sku = f"{cat}-{name}-{self.short_code}"
 
-            self.sku=base_sku
-        super().save(*args, **kwargs)
+    #         self.sku=base_sku
+    #     super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['name']
+
+class ProductVariant(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants")
+
+    sku = models.CharField(max_length=50, unique=True, editable=False)
+    short_code = models.CharField(max_length=8, unique=True, editable=False)
+
+    # Optional attributes
+    color = models.CharField(max_length=50, blank=True)
+    size = models.CharField(max_length=50, blank=True)
+    buying_price = models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
+    selling_price = models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
+
+    reorder_level = models.IntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['product', 'color', 'size'],
+                name='unique_variant_per_product'
+            )
+        ]
+
+    def clean(self):
+        if ProductVariant.objects.filter(
+            product=self.product,
+            color=self.color,
+            size=self.size
+        ).exclude(pk=self.pk).exists():
+            raise ValidationError(
+                "You already created an SKU for this product variant."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+
+        if not self.pk:
+            cat = self.product.category.name[:3].upper()
+            name = self.product.name[:3].upper()
+            self.short_code = uuid.uuid4().hex[:8].upper()
+            self.sku = f"{cat}-{name}-{self.short_code}"
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.product.name} - {self.sku}"
+    
+    
+
+
    
 class Supplier(models.Model):
     name = models.CharField(max_length=255, blank=False)

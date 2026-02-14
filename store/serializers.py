@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from decimal import Decimal
 from django.db.models.aggregates import Count, Sum
-from .models import Category, Customer, Payments, Product, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
+from .models import Category, Customer, Payments, Product, ProductVariant, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,12 +20,19 @@ class UnitMeasurementSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 class ProductSerializer(serializers.ModelSerializer):
-    sku = serializers.ReadOnlyField()
-    category = serializers.StringRelatedField()
-    unit_of_measure = serializers.StringRelatedField()
+    #sku = serializers.ReadOnlyField()
+    #category = serializers.StringRelatedField()
+    #unit_of_measure = serializers.StringRelatedField()
     class Meta:
         model = Product
-        fields = ['id', 'name','sku', 'category', 'current_quantity', 'reorder_level', 'buying_price', 'selling_price', 'unit_of_measure', 'is_active']
+        fields = ['id', 'name', 'category',  'unit_of_measure', 'is_active']
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    #product = serializers.StringRelatedField()
+
+    class Meta:
+        model = ProductVariant
+        fields = ['product','sku', 'color', 'size', 'buying_price', 'selling_price', 'reorder_level']
         
 class ProductValueSerializer(serializers.ModelSerializer):
     product_value = serializers.SerializerMethodField()
