@@ -1,72 +1,134 @@
 from rest_framework import serializers
 from decimal import Decimal
 from django.db.models.aggregates import Count, Sum
-from .models import Category, Customer, Payments, Product, ProductVariant, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
+from .models import Category, Customer, Product, ProductVariant, PurchaseOrder, PurchaseOrderItem, SalesOrder, SalesOrderItem, StockMovement, Supplier, UnitsMeasurement
 
 class CategorySerializer(serializers.ModelSerializer):
+    products_count = serializers.IntegerField(read_only=True)
+    
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'products_count', 'total_category_inventory']
+        fields = ['id', 'name', 'description', 'products_count']
 
-    products_count = serializers.IntegerField(read_only=True)
-    total_category_inventory = serializers.SerializerMethodField()
-
-    def get_total_category_inventory(self, obj):
-        return obj.product_set.aggregate(total=Sum('current_quantity'))['total'] or 0  
-    
 class UnitMeasurementSerializer(serializers.ModelSerializer):
     class Meta:
         model = UnitsMeasurement
-        fields = ['id', 'name']
+        fields = ['id', 'name'] 
 
 class ProductSerializer(serializers.ModelSerializer):
-    #sku = serializers.ReadOnlyField()
-    #category = serializers.StringRelatedField()
-    #unit_of_measure = serializers.StringRelatedField()
     class Meta:
         model = Product
-        fields = ['id', 'name', 'category',  'unit_of_measure', 'is_active']
+        fields = ['id', 'name', 'category', 'unit_of_measure', 'is_active']   
 
 class ProductVariantSerializer(serializers.ModelSerializer):
-    #product = serializers.StringRelatedField()
-
     class Meta:
         model = ProductVariant
         fields = ['product','sku', 'color', 'size', 'buying_price', 'selling_price', 'reorder_level']
-        
-class ProductValueSerializer(serializers.ModelSerializer):
-    product_value = serializers.SerializerMethodField()
-    category = serializers.StringRelatedField()
 
+class StockMovementSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Product
-        fields=['id', 'name', 'category', 'current_quantity', 'buying_price', 'product_value']
-
-    def get_product_value(self, product:Product):
-        return product.current_quantity * product.buying_price
+        model = StockMovement
+        fields=['id', 'variant', 'movement_type', 'quantity', 'created_at']
 
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model=Supplier
-        fields = ['id', 'name', 'email', 'phone', 'products', 'outstanding_balance']
+        fields = ['id', 'name', 'email', 'phone']
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model=Customer
-        fields = ['id', 'name', 'email', 'phone', 'products', 'outstanding_balance']
+        fields = ['id', 'name', 'email', 'phone']
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model=PurchaseOrder
-        fields = ['id', 'order_number', 'supplier', 'product', 'quantity', 'price_per_unit', 'total_amount', 'order_date']
+        fields = ['id', 'order_number', 'supplier', 'status', 'created_at']
+
+class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseOrderItem
+        fields = ['id', 'purchase_order', 'variant', 'quanitity', 'price_per_unit']
 
 class SalesOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model=SalesOrder
-        fields = ['id', 'invoice_number', 'customer', 'product', 'quantity', 'price_per_unit', 'total_amount', 'invoice_date']
+        fields = ['id', 'invoice_number', 'customer', 'status', 'created_at']
 
-
-class PaymentsSerializer(serializers.ModelSerializer):
+class SalesOrderItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Payments
-        fields=['id', 'payment_date', 'amount', 'payment_method', 'invoice_number', 'order_number', 'supplier', 'customer']
+        model = SalesOrderItem
+        fields = ['id', 'sales_order', 'variant', 'quanitity', 'price_per_unit']
+        
+# class CategorySerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Category
+#         fields = ['id', 'name', 'description', 'products_count', 'total_category_inventory']
+
+#     products_count = serializers.IntegerField(read_only=True)
+#     total_category_inventory = serializers.SerializerMethodField()
+
+#     def get_total_category_inventory(self, obj):
+#         return obj.product_set.aggregate(total=Sum('current_quantity'))['total'] or 0  
+    
+# class UnitMeasurementSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = UnitsMeasurement
+#         fields = ['id', 'name']
+
+# class ProductSerializer(serializers.ModelSerializer):
+#     #sku = serializers.ReadOnlyField()
+#     #category = serializers.StringRelatedField()
+#     #unit_of_measure = serializers.StringRelatedField()
+#     class Meta:
+#         model = Product
+#         fields = ['id', 'name', 'category',  'unit_of_measure', 'is_active']
+
+# class ProductVariantSerializer(serializers.ModelSerializer):
+#     #product = serializers.StringRelatedField()
+
+#     class Meta:
+#         model = ProductVariant
+#         fields = ['product','sku', 'color', 'size', 'buying_price', 'selling_price', 'reorder_level']
+        
+# class ProductValueSerializer(serializers.ModelSerializer):
+#     product_value = serializers.SerializerMethodField()
+#     category = serializers.StringRelatedField()
+
+#     class Meta:
+#         model = Product
+#         fields=['id', 'name', 'category', 'current_quantity', 'buying_price', 'product_value']
+
+#     def get_product_value(self, product:Product):
+#         return product.current_quantity * product.buying_price
+
+# class StockMovementSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = StockMovement
+#         fields=['id', 'variant', 'movement_type', 'quantity', 'created_at']
+
+# class SupplierSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model=Supplier
+#         fields = ['id', 'name', 'email', 'phone', 'products', 'outstanding_balance']
+
+# class CustomerSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model=Customer
+#         fields = ['id', 'name', 'email', 'phone', 'products', 'outstanding_balance']
+
+# class PurchaseOrderSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model=PurchaseOrder
+#         fields = ['id', 'order_number', 'supplier', 'product', 'quantity', 'price_per_unit', 'total_amount', 'order_date']
+
+# class SalesOrderSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model=SalesOrder
+#         fields = ['id', 'invoice_number', 'customer', 'product', 'quantity', 'price_per_unit', 'total_amount', 'invoice_date']
+
+
+# class PaymentsSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model=Payments
+#         fields=['id', 'payment_date', 'amount', 'payment_method', 'invoice_number', 'order_number', 'supplier', 'customer']

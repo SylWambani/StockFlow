@@ -5,8 +5,8 @@ from rest_framework import status
 from rest_framework.decorators import action
 from django.db.models import Sum, F, DecimalField
 from django.db.models.aggregates import Count
-from .models import Category, Customer, Payments, Product, ProductVariant, PurchaseOrder, SalesOrder, Supplier, UnitsMeasurement
-from .serializers import CategorySerializer, CustomerSerializer, PaymentsSerializer, ProductSerializer, ProductValueSerializer, ProductVariantSerializer, PurchaseOrderSerializer, SalesOrderSerializer, SupplierSerializer, UnitMeasurementSerializer
+from .models import Category, Customer, Product, ProductVariant, PurchaseOrder, PurchaseOrderItem, SalesOrder, SalesOrderItem, StockMovement, Supplier, UnitsMeasurement
+from .serializers import CategorySerializer, CustomerSerializer, ProductSerializer, ProductVariantSerializer, PurchaseOrderItemSerializer, PurchaseOrderSerializer, SalesOrderItemSerializer, SalesOrderSerializer, StockMovementSerializer, SupplierSerializer, UnitMeasurementSerializer
 
 class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.annotate(
@@ -35,45 +35,10 @@ class ProductViewSet(ModelViewSet):
 class ProductVariantViewSet(ModelViewSet):
     queryset = ProductVariant.objects.all()
     serializer_class = ProductVariantSerializer
-    
-    
-class ProductValueViewSet(ReadOnlyModelViewSet):
-    serializer_class = ProductValueSerializer
 
-    def get_queryset(self):
-        return Product.objects.select_related('category').all()
-    
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-
-        serializer = self.get_serializer(queryset, many=True)
-
-        category_values = (
-            queryset
-            .values(category_name=F('category__name'))
-            .annotate(
-                total_value=Sum(
-                    F('current_quantity') * F('buying_price'),
-                    output_field=DecimalField()
-                )
-            )
-            .order_by('category_name')
-        )
-
-        total_value = queryset.aggregate(
-            total=Sum(
-                F('current_quantity') * F('buying_price'),
-                output_field=DecimalField()
-            )
-        )['total'] or 0
-
-        return Response({
-            "total_inventory_value": total_value,
-            "categories": category_values,
-            "products": serializer.data
-        })
-    
-    
+class StockMovementViewSet(ModelViewSet):
+    queryset = StockMovement.objects.all()
+    serializer_class = StockMovementSerializer
 
 class SupplierViewSet(ModelViewSet):
     queryset = Supplier.objects.all()
@@ -87,10 +52,61 @@ class PurchaseOrderViewset(ModelViewSet):
     queryset = PurchaseOrder.objects.all()
     serializer_class = PurchaseOrderSerializer
 
+class PurchaseOrderItemViewSet(ModelViewSet):
+    queryset = PurchaseOrderItem.objects.all()
+    serializer_class = PurchaseOrderItemSerializer
+
 class SalesOrderViewset(ModelViewSet):
     queryset = SalesOrder.objects.all()
     serializer_class = SalesOrderSerializer
 
-class PaymentsViewset(ModelViewSet):
-    queryset = Payments.objects.all()
-    serializer_class = PaymentsSerializer
+class SalesOrderItemViewSet(ModelViewSet):
+    queryset = SalesOrderItem.objects.all()
+    serializer_class = SalesOrderItemSerializer
+    
+# class ProductValueViewSet(ReadOnlyModelViewSet):
+#     serializer_class = ProductValueSerializer
+
+#     def get_queryset(self):
+#         return Product.objects.select_related('category').all()
+    
+#     def list(self, request, *args, **kwargs):
+#         queryset = self.get_queryset()
+
+#         serializer = self.get_serializer(queryset, many=True)
+
+#         category_values = (
+#             queryset
+#             .values(category_name=F('category__name'))
+#             .annotate(
+#                 total_value=Sum(
+#                     F('current_quantity') * F('buying_price'),
+#                     output_field=DecimalField()
+#                 )
+#             )
+#             .order_by('category_name')
+#         )
+
+#         total_value = queryset.aggregate(
+#             total=Sum(
+#                 F('current_quantity') * F('buying_price'),
+#                 output_field=DecimalField()
+#             )
+#         )['total'] or 0
+
+#         return Response({
+#             "total_inventory_value": total_value,
+#             "categories": category_values,
+#             "products": serializer.data
+#         })
+    
+    
+
+
+
+
+
+
+# class PaymentsViewset(ModelViewSet):
+#     queryset = Payments.objects.all()
+#     serializer_class = PaymentsSerializer

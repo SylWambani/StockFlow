@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 #from .utils import create_unique_code
 
 class Category(models.Model):
-    name = models.CharField(max_length=255, blank=False)
+    name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
 
     def __str__(self) -> str:
@@ -15,7 +15,7 @@ class Category(models.Model):
         ordering = ['name']
 
 class UnitsMeasurement(models.Model):
-    name = models.CharField(max_length=100, blank=False)
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self) -> str:
         return self.name
@@ -100,56 +100,137 @@ class ProductVariant(models.Model):
         return f"{self.product.name} - {self.sku}"
     
     
+#INVENTORY LEDGER
+class StockMovement(models.Model):
+    MOVEMENT_TYPES = (
+        ('IN', 'Stock In'),
+        ('OUT', 'Stock Out'),
+        ('ADJ', 'Adjustment'),
+    )
+
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name="movements")
+    movement_type = models.CharField(max_length=10, choices=MOVEMENT_TYPES)
+    quantity = models.IntegerField()
+    reference = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.movement_type == 'OUT':
+            self.quantity = -abs(self.quantity)
+        elif self.movement_type == 'IN':
+            self.quantity = abs(self.quantity)
+
+        super().save(*args, **kwargs)
 
 
    
+#BUSINESS PARTIES
 class Supplier(models.Model):
     name = models.CharField(max_length=255, blank=False)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=255)
-    products=models.ManyToManyField(Product)
-    outstanding_balance=models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
+    # products=models.ManyToManyField(Product)
+    # outstanding_balance=models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
+
+    def __str__(self):
+        return self.name
 
 class Customer(models.Model):
     name = models.CharField(max_length=255, blank=False)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=255)
-    products=models.ManyToManyField(Product)
-    outstanding_balance=models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
+    # products=models.ManyToManyField(Product)
+    # outstanding_balance=models.DecimalField(max_digits=20, decimal_places=2, validators=[MinValueValidator(0)])
 
+    def __str__(self):
+        return self.name
+
+#PO HEADER
 class PurchaseOrder(models.Model):
-    order_number = models.CharField(max_length=255, unique=True, blank=False)
-    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT,null=False, blank=False )
-    product=models.ForeignKey(Product, on_delete=models.PROTECT)
+    STATUS_CHOICES = (
+        ('DRAFT', 'Draft'),
+        ('APPROVED', 'Approved'),
+        ('RECEIVED', 'Received'),
+    )
+
+    order_number = models.CharField(max_length=50, unique=True)
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.order_number
+
+class PurchaseOrderItem(models.Model):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="items")
+    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     price_per_unit = models.DecimalField(max_digits=20, decimal_places=2)
-    total_amount = models.DecimalField(max_digits=20, decimal_places=2)
-    order_date = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def total_amount(self):
+        return self.quantity * self.price_per_unit
 
 class SalesOrder(models.Model):
-    invoice_number = models.CharField(max_length=255, unique=True, blank=False)
+    STATUS_CHOICES = (
+        ('DRAFT', 'Draft'),
+        ('CONFIRMED', 'Confirmed'),
+        ('DELIVERED', 'Delivered'),
+    )
+
+    invoice_number = models.CharField(max_length=50, unique=True)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
-    product=models.ForeignKey(Product, on_delete=models.PROTECT, null=False, blank=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.invoice_number
+
+class SalesOrderItem(models.Model):
+    sales_order = models.ForeignKey(SalesOrder, on_delete=models.CASCADE, related_name="items")
+    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     price_per_unit = models.DecimalField(max_digits=20, decimal_places=2)
-    total_amount = models.DecimalField(max_digits=20, decimal_places=2)
-    invoice_date = models.DateTimeField(auto_now_add=True)
 
-class Payments(models.Model):
-    PAYMENT_METHOD_CASH = 'CASH'
-    PAYMENT_METHOD_CREDIT_CARD = 'CREDIT_CARD'
-    PAYMENT_METHOD_BANK_TRANSFER = 'BANK_TRANSFER'
+    @property
+    def total_amount(self):
+        return self.quantity * self.price_per_unit
 
-    PAYMENT_METHOD_CHOICES = [
-        (PAYMENT_METHOD_CASH, 'Cash'),
-        (PAYMENT_METHOD_CREDIT_CARD, 'Credit Card'),
-        (PAYMENT_METHOD_BANK_TRANSFER, 'Bank Transfer')
-    ]
 
-    payment_date = models.DateTimeField(auto_now_add=True)
-    amount = models.DecimalField(max_digits=20, decimal_places=2)
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
-    invoice_number = models.ForeignKey(SalesOrder, on_delete=models.PROTECT)
-    order_number = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT)
-    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+# class PurchaseOrder(models.Model):
+#     order_number = models.CharField(max_length=255, unique=True, blank=False)
+#     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT,null=False, blank=False )
+#     product=models.ForeignKey(Product, on_delete=models.PROTECT)
+#     quantity = models.PositiveIntegerField()
+#     price_per_unit = models.DecimalField(max_digits=20, decimal_places=2)
+#     total_amount = models.DecimalField(max_digits=20, decimal_places=2)
+#     order_date = models.DateTimeField(auto_now_add=True)
+#     is_approved = models.BooleanField(default=False)
+
+# class SalesOrder(models.Model):
+#     invoice_number = models.CharField(max_length=255, unique=True, blank=False)
+#     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+#     product=models.ForeignKey(Product, on_delete=models.PROTECT, null=False, blank=False)
+#     quantity = models.PositiveIntegerField()
+#     price_per_unit = models.DecimalField(max_digits=20, decimal_places=2)
+#     total_amount = models.DecimalField(max_digits=20, decimal_places=2)
+#     invoice_date = models.DateTimeField(auto_now_add=True)
+
+# class Payments(models.Model):
+#     PAYMENT_METHOD_CASH = 'CASH'
+#     PAYMENT_METHOD_CREDIT_CARD = 'CREDIT_CARD'
+#     PAYMENT_METHOD_BANK_TRANSFER = 'BANK_TRANSFER'
+
+#     PAYMENT_METHOD_CHOICES = [
+#         (PAYMENT_METHOD_CASH, 'Cash'),
+#         (PAYMENT_METHOD_CREDIT_CARD, 'Credit Card'),
+#         (PAYMENT_METHOD_BANK_TRANSFER, 'Bank Transfer')
+#     ]
+
+#     payment_date = models.DateTimeField(auto_now_add=True)
+#     amount = models.DecimalField(max_digits=20, decimal_places=2)
+#     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+#     invoice_number = models.ForeignKey(SalesOrder, on_delete=models.PROTECT)
+#     order_number = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT)
+#     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
+#     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
